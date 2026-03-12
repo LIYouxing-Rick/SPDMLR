@@ -1,0 +1,37 @@
+name: TSMNet
+inputtype: ${torchdtype:float32}
+model:
+    _target_: spdnets.models.TSMNetMLR
+    temporal_filters: 4
+    spatial_filters: 40
+    subspacedims: 20
+    bnorm: null
+    bnorm_dispersion: null
+    classifier: LogEigMLR #LogEigMLR, SPDMLR
+    metric: SPDLogCholeskyMetric #SPDLogEuclideanMetric,SPDLogCholeskyMetric
+    power: 1.
+    alpha: 1.0
+    beta: 0.0
+    swd_power: 2.0
+    # SWD 可配置参数：投影数和两个正则权重的初值
+    n_proj: 50
+    loss_lambda1_init: 1.0
+    loss_lambda2_init: 1.0
+    # SWD 距离度量与项开关
+    swd_metric: lsm  # lsm|olm|ecm|lecm
+    use_lp: true     # 启用 spdsw(LP)
+    use_logm: true   # 启用 spdsw2(sym_logm(SPD))
+optimizer:
+    _target_: geoopt.optim.RiemannianAdam
+    amsgrad: True
+    weight_decay: 1e-4
+    lr: 1e-3
+    # 可分别设置网络参数与 SWD loss 权重的学习率；默认与 lr 相同
+    net_lr: ${nnet.optimizer.lr}
+    loss_lr: ${nnet.optimizer.lr}
+    param_groups:
+        -
+            - 'spdnet.*.W'
+            - weight_decay: 0
+scheduler:
+    _target_: spdnets.batchnorm.DummyScheduler

@@ -1,0 +1,77 @@
+====================================================================================================================================================================================
+Group                                                                                                                    N     Final Acc (Mean±Std)           Best Acc (Mean±Std)           
+====================================================================================================================================================================================
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=ecm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5241±0.0060 [0.5141-0.5327]  N/A                           
+  Seeds: 0, 2, 4, 1, 3
+  Final accuracies: ['0.5141', '0.5327', '0.5243', '0.5267', '0.5229']
+
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=lecm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5239±0.0104 [0.5045-0.5327]  N/A                           
+  Seeds: 2, 0, 3, 4, 1
+  Final accuracies: ['0.5327', '0.5045', '0.5321', '0.5283', '0.5219']
+
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=olm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5057±0.0076 [0.4966-0.5141]  N/A                           
+  Seeds: 1, 3, 4, 2, 0
+  Final accuracies: ['0.5117', '0.4966', '0.5095', '0.4966', '0.5141']
+
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=lsm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.4966±0.0057 [0.4863-0.5035]  N/A                           
+  Seeds: 2, 3, 0, 1, 4
+  Final accuracies: ['0.4987', '0.4863', '0.4986', '0.4960', '0.5035']
+
+====================================================================================================================================================================================
+
+
+====================================================================================================================================================================================
+按 n_proj 分组的结果:
+====================================================================================================================================================================================
+
+**n_proj = 150**
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Configuration                                                                                                  N     Final Acc (Mean±Std)           Best Acc (Mean±Std)           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|sampling=ecm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5241±0.0060                  N/A                           
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|sampling=lecm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5239±0.0104                  N/A                           
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|sampling=olm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5057±0.0076                  N/A                           
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|sampling=lsm|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.4966±0.0057                  N/A                           
+
+
+====================================================================================================================================================================================
+按 sampling (metric) 分组的结果:
+====================================================================================================================================================================================
+
+**sampling = ecm**
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Configuration                                                                                                  N     Final Acc (Mean±Std)           Best Acc (Mean±Std)           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5241±0.0060                  N/A                           
+
+**sampling = lecm**
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Configuration                                                                                                  N     Final Acc (Mean±Std)           Best Acc (Mean±Std)           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5239±0.0104                  N/A                           
+
+**sampling = lsm**
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Configuration                                                                                                  N     Final Acc (Mean±Std)           Best Acc (Mean±Std)           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.4966±0.0057                  N/A                           
+
+**sampling = olm**
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Configuration                                                                                                  N     Final Acc (Mean±Std)           Best Acc (Mean±Std)           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|lp=on|logm=on|lamda=0.75|gamma=0.75|init_l1=0.75|init_l2=0.75|power=4.0 5     0.5057±0.0076                  N/A                           
+
+
+====================================================================================================================================================================================
+按 init λ 分组的结果:
+====================================================================================================================================================================================
+
+**init_l1 = 0.75 | init_l2 = 0.75**
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Configuration                                                                                                  N     Final Acc (Mean±Std)           Best Acc (Mean±Std)           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=ecm|lp=on|logm=on|lamda=0.75|gamma=0.75|power=4.0 5     0.5241±0.0060                  N/A                           
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=lecm|lp=on|logm=on|lamda=0.75|gamma=0.75|power=4.0 5     0.5239±0.0104                  N/A                           
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=olm|lp=on|logm=on|lamda=0.75|gamma=0.75|power=4.0 5     0.5057±0.0076                  N/A                           
+evaluation=inter-subject|net_lr=0.001|loss_lr=0.0005|optimizer=unknown|weight_decay=unknown|architect=TSMNet+SPDDSMBNLogEigMLR-[40,20]|n_proj=150|sampling=lsm|lp=on|logm=on|lamda=0.75|gamma=0.75|power=4.0 5     0.4966±0.0057                  N/A                           
