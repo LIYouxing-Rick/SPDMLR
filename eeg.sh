@@ -82,13 +82,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${METRICS,,}" == "all" ]]; then
-  METRICS="ecm,lecm,olm,lsm"
-fi
-
 if [[ "${FORCE_SPDSW}" -eq 1 ]]; then
   USE_LP="false"
   USE_LOGM="true"
+fi
+if [[ "${METRICS,,}" == "all" ]]; then
+  METRICS="ecm,lecm,olm,lsm"
 fi
 
 module purge
