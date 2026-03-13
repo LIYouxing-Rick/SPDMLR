@@ -418,7 +418,7 @@ def training(cfg,args):
                                     'time': duration,
                                     'n_test': len(test),
                                     'classes': n_classes}, index=[resix])
-                results = results.append(res)
+                results = pd.concat([results, res])
                 resix += 1
                 r = res.iloc[0, :]
                 log.info(
@@ -447,7 +447,7 @@ def training(cfg,args):
                                         'time': duration,
                                         'n_test': len(test),
                                         'classes': n_classes}, index=[resix])
-                    results = results.append(res)
+                    results = pd.concat([results, res])
                     resix += 1
                     r = res.iloc[0, :]
                     log.info(
