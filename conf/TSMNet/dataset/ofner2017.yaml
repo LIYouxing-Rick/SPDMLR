@@ -1,0 +1,9 @@
+name: Ofner2017
+type:
+    _target_: moabb.datasets.Ofner2017
+
+classes: ["right_elbow_flexion", "right_elbow_extension", "right_supination", "right_pronation", "right_hand_close", "right_hand_open", "rest"]
+channels: null
+resample: 250
+tmin: 0.0
+tmax: 3.0

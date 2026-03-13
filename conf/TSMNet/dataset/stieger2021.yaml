@@ -1,0 +1,9 @@
+name: Stieger2021
+type:
+    _target_: moabb.datasets.Stieger2021
+
+classes: ["right_hand", "left_hand", "both_hand", "rest"]
+channels: null
+resample: 250
+tmin: 0.0
+tmax: 3.0

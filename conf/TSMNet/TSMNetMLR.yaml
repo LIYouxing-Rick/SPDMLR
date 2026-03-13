@@ -17,12 +17,25 @@ fit:
   # 为兼容 SPD 实验脚本风格，支持在 fit 下覆盖以下顶层键
   seed: 42
   device: 0
-  data_dir: /data
+  data_dir: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data
 
 score: balanced_accuracy # sklearn scores
 device: GPU
 threadnum: 2
-data_dir: /data #change this to your data folder
+data_dir: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data
+data_paths:
+  openneuro_ds004745: /leonardo_scratch/fast/EUHPC_D33_186/openneuro/ds004745
+  openneuro_ds004306: /leonardo_scratch/fast/EUHPC_D33_186/openneuro/ds004306
+  hf_alljoined_05_125_cache: /leonardo_scratch/fast/EUHPC_D33_186/hf_cache/datasets/Alljoined___05_125
+  moabb_stieger2021: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-Stieger2021-data
+  moabb_lee2019_mi: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-lee2019-mi-data
+  moabb_ofner2017: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-upperlimb-data
+  moabb_bnci2014_001: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-bnci-data/database/data-sets/001-2014
+  moabb_bnci2015_001: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-bnci-data/database/data-sets/001-2015
+  moabb_bnci2025_001: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-bnci-data/~bci/database/001-2025
+  moabb_bnci2025_002: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-bnci-data/database/data-sets/002-2025
+  moabb_beetl2021_a: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-Beetl2021-A-data
+  moabb_beetl2021_b: /leonardo_scratch/fast/EUHPC_D33_186/eeg_datasets/moabb_mne_data/MNE-Beetl2021-B-data
 is_debug: False
 seed: 42
 is_timing: False

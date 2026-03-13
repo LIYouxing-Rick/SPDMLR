@@ -5,6 +5,7 @@ import torch as th
 
 from datasets.spdnet.Radar_Loader import DataLoaderRadar
 from datasets.spdnet.HDM05_Loader import DataLoaderHDM05
+from datasets.spdnet.MOABB_Loader import DataLoaderMOABBCov
 
 def get_dataset_settings(args):
     if args.dataset=='HDM05':
@@ -14,7 +15,27 @@ def get_dataset_settings(args):
         pval = 0.25
         DataLoader = DataLoaderRadar(args.path,pval,args.batchsize)
     else:
-        raise Exception('unknown dataset {}'.format(args.dataset))
+        DataLoader = DataLoaderMOABBCov(
+            data_root=args.path,
+            dataset_key=args.dataset,
+            batch_size=args.batchsize,
+            seed=args.seed,
+            test_size=getattr(args, 'test_size', 0.25),
+        )
+        args.class_num = DataLoader.n_classes
+        dims = [int(dim) for dim in args.architecture]
+        if len(dims) < 2:
+            dims = [DataLoader.spd_dim, max(4, DataLoader.spd_dim // 2)]
+        if dims[0] != DataLoader.spd_dim:
+            if len(dims) == 2:
+                dims = [DataLoader.spd_dim, min(dims[-1], DataLoader.spd_dim)]
+            else:
+                dims = [DataLoader.spd_dim] + [min(d, DataLoader.spd_dim) for d in dims[1:]]
+            dims = [max(2, int(d)) for d in dims]
+            for i in range(1, len(dims)):
+                if dims[i] > dims[i-1]:
+                    dims[i] = dims[i-1]
+        args.architecture = dims
     return DataLoader
 
 def get_model_name(args):
@@ -74,8 +95,9 @@ def parse_cfg(args,cfg):
 
     #dataset
     args.dataset = cfg.dataset.name
-    args.class_num=cfg.dataset.class_num
+    args.class_num=getattr(cfg.dataset, 'class_num', None)
     args.path = cfg.dataset.path
+    args.test_size = float(getattr(cfg.dataset, 'test_size', 0.25))
 
     # get model name
     args.modelname = get_model_name(args)

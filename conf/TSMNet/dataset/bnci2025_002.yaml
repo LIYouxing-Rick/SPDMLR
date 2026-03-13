@@ -1,0 +1,9 @@
+name: BNCI2025_002
+type:
+    _target_: moabb.datasets.BNCI2025_002
+
+classes: ["snakerun", "freerun", "eyerun"]
+channels: null
+resample: 200
+tmin: 0.0
+tmax: 8.0

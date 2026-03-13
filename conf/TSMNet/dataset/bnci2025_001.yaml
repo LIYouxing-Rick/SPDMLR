@@ -1,0 +1,9 @@
+name: BNCI2025_001
+type:
+    _target_: moabb.datasets.BNCI2025_001
+
+classes: ["up_slow_near", "up_slow_far", "up_fast_near", "up_fast_far", "down_slow_near", "down_slow_far", "down_fast_near", "down_fast_far", "left_slow_near", "left_slow_far", "left_fast_near", "left_fast_far", "right_slow_near", "right_slow_far", "right_fast_near", "right_fast_far"]
+channels: null
+resample: 250
+tmin: 0.0
+tmax: 4.0

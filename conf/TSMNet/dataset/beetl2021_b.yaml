@@ -1,0 +1,9 @@
+name: Beetl2021_B
+type:
+    _target_: moabb.datasets.Beetl2021_B
+
+classes: ["left_hand", "right_hand", "feet", "rest"]
+channels: null
+resample: 200
+tmin: 0.0
+tmax: 4.0

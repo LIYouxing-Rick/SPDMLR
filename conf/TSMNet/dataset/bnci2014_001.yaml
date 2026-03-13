@@ -1,0 +1,9 @@
+name: BNCI2014_001
+type:
+    _target_: moabb.datasets.BNCI2014_001
+
+classes: ["left_hand", "right_hand", "feet", "tongue"]
+channels: null
+resample: 250
+tmin: 0.0
+tmax: 4.0
