@@ -136,18 +136,38 @@ class CachedParadigm(BaseParadigm):
                 f.write(self._get_rep(dataset))
 
         for subject in subjects:
-            if not os.path.isfile(os.path.join(cache_dir, f'{subject}.npy')):
-                # compute
-                x, lbs, meta = super().get_data(dataset, [subject], return_epochs)
-                np.save(os.path.join(cache_dir, f'{subject}.npy'), x)
-                meta['label'] = lbs
-                meta.to_csv(os.path.join(cache_dir, f'{subject}.csv'), index=False)
+            npy_path = os.path.join(cache_dir, f'{subject}.npy')
+            csv_path = os.path.join(cache_dir, f'{subject}.csv')
+
+            def _build_cache():
+                x_local, lbs_local, meta_local = super(CachedParadigm, self).get_data(dataset, [subject], return_epochs)
+                npy_tmp = f"{npy_path}.tmp.{os.getpid()}.npy"
+                csv_tmp = f"{csv_path}.tmp.{os.getpid()}"
+                np.save(npy_tmp, x_local)
+                meta_local['label'] = lbs_local
+                meta_local.to_csv(csv_tmp, index=False)
+                os.replace(npy_tmp, npy_path)
+                os.replace(csv_tmp, csv_path)
                 log.info(f'saved cached data in directory {cache_dir}')
 
-            # load from cache
+            if (not os.path.isfile(npy_path)) or (not os.path.isfile(csv_path)):
+                _build_cache()
+
             log.info(f'loading cached data from directory {cache_dir}')
-            x = np.load(os.path.join(cache_dir, f'{subject}.npy'), mmap_mode ='r')
-            meta = pd.read_csv(os.path.join(cache_dir, f'{subject}.csv'))
+            try:
+                x = np.load(npy_path, mmap_mode='r')
+                meta = pd.read_csv(csv_path)
+            except Exception:
+                try:
+                    if os.path.isfile(npy_path):
+                        os.remove(npy_path)
+                    if os.path.isfile(csv_path):
+                        os.remove(csv_path)
+                except Exception:
+                    pass
+                _build_cache()
+                x = np.load(npy_path, mmap_mode='r')
+                meta = pd.read_csv(csv_path)
             lbs = meta['label'].tolist()
 
             if return_epochs:
@@ -191,4 +211,3 @@ class CachedFilterBankMotorImagery(CachedParadigm, FilterBankMotorImagery):
     def __init__(self, **kwargs):
         n_classes = len(kwargs['events'])
         super().__init__(n_classes=n_classes, **kwargs)    
-

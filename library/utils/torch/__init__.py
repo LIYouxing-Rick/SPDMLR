@@ -201,18 +201,30 @@ class CombinedDomainDataset(DomainDataset, torch.utils.data.ConcatDataset):
                 labels += [l]
         metadata = pd.concat(metadata, ignore_index=True)
         labels =  torch.from_numpy(LabelEncoder().fit_transform(np.concatenate(labels))).to(dtype=torch.long)
-        try:
-            domain_values = metadata.eval(domain_expression)
-        except Exception:
-            if domain_expression in metadata.columns:
-                domain_values = metadata[domain_expression]
-            else:
-                raise
-        domain_numeric = pd.to_numeric(domain_values, errors='coerce')
-        if domain_numeric.notna().all():
-            domain_ids = domain_numeric.to_numpy(dtype=np.int64)
+
+        def _to_int_codes(series):
+            numeric = pd.to_numeric(series, errors='coerce')
+            if numeric.notna().all():
+                return numeric.to_numpy(dtype=np.int64)
+            return pd.factorize(series.astype(str), sort=True)[0].astype(np.int64)
+
+        expr = str(domain_expression).replace(' ', '')
+        if expr == 'session':
+            domain_ids = _to_int_codes(metadata['session'])
+        elif expr == 'subject':
+            domain_ids = _to_int_codes(metadata['subject'])
+        elif expr == 'session+subject*1000':
+            session_ids = _to_int_codes(metadata['session'])
+            subject_ids = _to_int_codes(metadata['subject'])
+            domain_ids = session_ids + subject_ids * 1000
+        elif domain_expression in metadata.columns:
+            domain_ids = _to_int_codes(metadata[domain_expression])
         else:
-            domain_ids = pd.factorize(domain_values.astype(str), sort=True)[0].astype(np.int64)
+            try:
+                domain_values = metadata.eval(domain_expression)
+                domain_ids = _to_int_codes(domain_values)
+            except Exception:
+                raise ValueError(f"Unsupported domain_expression: {domain_expression}")
         domains = torch.from_numpy(domain_ids)
 
         return CombinedDomainDataset(features=features, labels=labels, domains=domains, metadata=metadata, **kwargs)

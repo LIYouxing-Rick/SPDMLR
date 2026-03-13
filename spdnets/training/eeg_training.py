@@ -501,6 +501,7 @@ def training(cfg,args):
                 netkwargs['iterator_train__batch_size'] = cfg.fit.batch_size_train
             netkwargs['iterator_valid__batch_size'] = batch_size_valid
             netkwargs['max_epochs'] = cfg.fit.epochs
+            netkwargs['classes'] = np.arange(n_classes, dtype=np.int64)
             netkwargs[
                 'callbacks__print_log__prefix'] = f'{dataset.code} {n_classes}cl | {test_groups} | {args.model_name} :'
 
