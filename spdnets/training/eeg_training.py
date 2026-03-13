@@ -333,11 +333,15 @@ def training(cfg,args):
         if cfg.nnet.prep_pipeline is not None:
             ds = ds.cache()  # we need to load the entire dataset for preprocessing
 
-        sessions = ds.metadata.session.astype(np.int64).values
-        subjects = ds.metadata.subject.astype(np.int64).values
+        def _to_int_codes(series):
+            numeric = pd.to_numeric(series, errors='coerce')
+            if numeric.notna().all():
+                return numeric.astype(np.int64).values
+            return pd.factorize(series.astype(str), sort=True)[0].astype(np.int64)
 
-        # 避免字符串列强制转换报错，稳健地将分组变量转换为 int64
-        g = pd.to_numeric(ds.metadata[groupvarname], errors='coerce').astype(np.int64).values
+        sessions = _to_int_codes(ds.metadata.session)
+        subjects = _to_int_codes(ds.metadata.subject)
+        g = _to_int_codes(ds.metadata[groupvarname])
         groups = np.unique(g)
 
         domains = ds.domains.unique()

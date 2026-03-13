@@ -201,7 +201,19 @@ class CombinedDomainDataset(DomainDataset, torch.utils.data.ConcatDataset):
                 labels += [l]
         metadata = pd.concat(metadata, ignore_index=True)
         labels =  torch.from_numpy(LabelEncoder().fit_transform(np.concatenate(labels))).to(dtype=torch.long)
-        domains = torch.from_numpy(metadata.eval(domain_expression).to_numpy(dtype=np.int64))
+        try:
+            domain_values = metadata.eval(domain_expression)
+        except Exception:
+            if domain_expression in metadata.columns:
+                domain_values = metadata[domain_expression]
+            else:
+                raise
+        domain_numeric = pd.to_numeric(domain_values, errors='coerce')
+        if domain_numeric.notna().all():
+            domain_ids = domain_numeric.to_numpy(dtype=np.int64)
+        else:
+            domain_ids = pd.factorize(domain_values.astype(str), sort=True)[0].astype(np.int64)
+        domains = torch.from_numpy(domain_ids)
 
         return CombinedDomainDataset(features=features, labels=labels, domains=domains, metadata=metadata, **kwargs)
 
