@@ -269,6 +269,12 @@ for metric in "${METRIC_LIST[@]}"; do
     else
       SPDNET_CLASSIFIER="SPDMLR"
       SPDNET_METRIC="SPDLogEuclideanMetric"
+      SPDNET_SPLIT_MODE="random"
+      if [[ "${EVALUATION_CFG}" == *"inter-session"* ]]; then
+        SPDNET_SPLIT_MODE="session"
+      elif [[ "${EVALUATION_CFG}" == *"inter-subject"* ]]; then
+        SPDNET_SPLIT_MODE="subject"
+      fi
       if [[ "${metric}" == "lsm" || "${metric}" == "olm" || "${metric}" == "spdsw" ]]; then
         SPDNET_METRIC="SPDLogCholeskyMetric"
       fi
@@ -279,6 +285,7 @@ for metric in "${METRIC_LIST[@]}"; do
         hydra/launcher=joblib \
         hydra.launcher.n_jobs=1 \
         dataset=RADAR dataset.name="${DATASET_CFG}" dataset.path="${EEG_DATA_ROOT}" fit.seed="${seed}" \
+        dataset.split_mode="${SPDNET_SPLIT_MODE}" \
         nnet.model.classifier="${SPDNET_CLASSIFIER}" nnet.model.metric="${SPDNET_METRIC}" \
         nnet.optimizer.lr="${LR}" fit.is_save=True 2>&1 | tee "${RUN_LOG}" &
     fi

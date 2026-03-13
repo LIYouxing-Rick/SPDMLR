@@ -21,6 +21,7 @@ def get_dataset_settings(args):
             batch_size=args.batchsize,
             seed=args.seed,
             test_size=getattr(args, 'test_size', 0.25),
+            split_mode=getattr(args, 'split_mode', 'random'),
         )
         args.class_num = DataLoader.n_classes
         dims = [int(dim) for dim in args.architecture]
@@ -98,6 +99,7 @@ def parse_cfg(args,cfg):
     args.class_num=getattr(cfg.dataset, 'class_num', None)
     args.path = cfg.dataset.path
     args.test_size = float(getattr(cfg.dataset, 'test_size', 0.25))
+    args.split_mode = str(getattr(cfg.dataset, 'split_mode', 'random')).lower()
 
     # get model name
     args.modelname = get_model_name(args)
