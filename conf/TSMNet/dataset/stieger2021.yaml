@@ -1,6 +1,6 @@
 name: Stieger2021
 type:
-    _target_: moabb.datasets.Stieger2021
+    _target_: datasets.eeg.moabb.Stieger2021Local
 
 classes: ["right_hand", "left_hand", "both_hand", "rest"]
 channels: null

@@ -73,6 +73,12 @@ def training(cfg,args):
     os.environ['MNE_DATA'] = str(data_dir)
     os.environ['MNEDATASET_TMP_DIR'] = str(data_dir)
     os.environ['_MNE_FAKE_HOME_DIR'] = str(data_dir)
+    try:
+        local_stieger_dir = getattr(getattr(cfg, 'data_paths', {}), 'moabb_stieger2021')
+        if local_stieger_dir:
+            os.environ['STIEGER2021_LOCAL_DIR'] = str(local_stieger_dir)
+    except Exception:
+        pass
     # Try to set MNE configs robustly
     try:
         mne.set_config("MNE_DATA", data_dir)
@@ -210,6 +216,12 @@ def training(cfg,args):
     # Robust dataset instantiation that avoids strict reliance on cfg.dataset.type
     dataset = None
     if isinstance(cfg.dataset, DictConfig):
+        ds_name = str(cfg.dataset.get('name', '')).lower() if ('name' in cfg.dataset) else ''
+        ds_type_cfg = cfg.dataset.get('type', None)
+        if ds_name == 'stieger2021' and isinstance(ds_type_cfg, DictConfig):
+            if str(ds_type_cfg.get('_target_', '')) == 'moabb.datasets.Stieger2021':
+                with open_dict(cfg):
+                    cfg.dataset.type._target_ = 'datasets.eeg.moabb.Stieger2021Local'
         ds_type_cfg = cfg.dataset.get('type', None)
         if ds_type_cfg is not None:
             try:
