@@ -138,9 +138,15 @@ export OMP_NUM_THREADS=8
 export MKL_NUM_THREADS=8
 export OPENBLAS_NUM_THREADS=8
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ACC_FILE="${SCRIPT_DIR}/acc.txt"
-CHECKPOINT_DIR="${SCRIPT_DIR}/.eeg_checkpoints"
+RUN_BASE_DIR="${SLURM_SUBMIT_DIR:-${FOUND_PROJECT}}"
+if [[ ! -d "${RUN_BASE_DIR}" ]]; then
+  RUN_BASE_DIR="${FOUND_PROJECT}"
+fi
+if [[ ! -w "${RUN_BASE_DIR}" ]]; then
+  RUN_BASE_DIR="${PWD}"
+fi
+ACC_FILE="${RUN_BASE_DIR}/acc.txt"
+CHECKPOINT_DIR="${RUN_BASE_DIR}/.eeg_checkpoints"
 mkdir -p "${CHECKPOINT_DIR}"
 
 if ! [[ "${MAX_RUNTIME_HOURS}" =~ ^[0-9]+$ ]] || [[ "${MAX_RUNTIME_HOURS}" -le 0 ]]; then
@@ -249,7 +255,7 @@ for metric in "${METRIC_LIST[@]}"; do
       break
     fi
 
-    RUN_LOG="${SCRIPT_DIR}/run_${SLURM_JOB_ID:-local}_$(date +%Y%m%d_%H%M%S)_${metric}_seed${seed}.log"
+    RUN_LOG="${RUN_BASE_DIR}/run_${SLURM_JOB_ID:-local}_$(date +%Y%m%d_%H%M%S)_${metric}_seed${seed}.log"
     remaining=$((TIMEOUT_SECONDS - elapsed))
     if [[ "${remaining}" -le 0 ]]; then
       TIMED_OUT=1
@@ -338,7 +344,11 @@ done
 
 if [[ "${TIMED_OUT}" -eq 1 ]]; then
   if [[ "${AUTO_RESUBMIT}" -eq 1 ]]; then
-    sbatch "${SCRIPT_DIR}/eeg.sh" "${ORIGINAL_ARGS[@]}"
+    RESUBMIT_SCRIPT="${RUN_BASE_DIR}/eeg.sh"
+    if [[ ! -f "${RESUBMIT_SCRIPT}" ]]; then
+      RESUBMIT_SCRIPT="${FOUND_PROJECT}/eeg.sh"
+    fi
+    sbatch "${RESUBMIT_SCRIPT}" "${ORIGINAL_ARGS[@]}"
     exit 0
   fi
   exit 0
