@@ -293,7 +293,10 @@ def training(cfg,args):
             return np.nan
         return scorefun(y_true[~masked], y_pred[~masked], **kwargs)
 
-    scorer = make_scorer(masked_scorefun)
+    def scorer(net, X, y):
+        y_true = np.asarray(y)
+        y_pred = np.asarray(net.predict(X))
+        return masked_scorefun(y_true, y_pred)
 
     dadapt = cfg.evaluation.adapt
 
