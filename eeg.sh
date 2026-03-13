@@ -53,14 +53,16 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dataset|--datasets|--datsets) DATASET_CFG="$2"; shift 2 ;;
     --evaluation) EVALUATION_CFG="$2"; shift 2 ;;
+    --session) EVALUATION_CFG="inter-session+uda"; shift ;;
+    --subject) EVALUATION_CFG="inter-subject+uda"; shift ;;
     --framework) FRAMEWORK="$2"; shift 2 ;;
     --data-root) EEG_DATA_ROOT="$2"; shift 2 ;;
     --seeds) SEED_LIST="$2"; shift 2 ;;
     --n-jobs) N_JOBS="$2"; shift 2 ;;
     --max-batch-size) MAX_BATCH_SIZE="$2"; shift 2 ;;
     --metrics|--distance|--distances) METRICS="$2"; shift 2 ;;
-    --use-lp) USE_LP="$2"; shift 2 ;;
-    --use-logm) USE_LOGM="$2"; shift 2 ;;
+    --use-lp|--lp) USE_LP="$2"; shift 2 ;;
+    --use-logm|--logm) USE_LOGM="$2"; shift 2 ;;
     --n-proj) N_PROJ="$2"; shift 2 ;;
     --swd-power) SWD_POWER="$2"; shift 2 ;;
     --lambda1) LAMBDA1="$2"; shift 2 ;;
@@ -79,6 +81,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${METRICS,,}" == "all" ]]; then
+  METRICS="ecm,lecm,olm,lsm"
+fi
 
 if [[ "${FORCE_SPDSW}" -eq 1 ]]; then
   USE_LP="false"
