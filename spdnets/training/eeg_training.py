@@ -726,7 +726,7 @@ def training(cfg,args):
             for method in results['method'].unique():
                 method_res = results[results['method'] == method]
                 method_res.to_csv(os.path.join(res_dir, f'scores_{method}.csv'), index=False)
-        tmp = results.groupby('method').agg(['mean', 'std'])
+        tmp = results.groupby('method')[['score_trn', 'score_tst', 'time']].agg(['mean', 'std'])
         column_labels = [('score_trn', 'mean'), ('score_trn', 'std'), \
                          ('score_tst', 'mean'), ('score_tst', 'std')]
         time_lables = [('time', 'mean'), ('time', 'std')]
