@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 import torch
 from skorch.classifier import NeuralNetClassifier
 from skorch.callbacks.logging import EpochTimer, PrintLog
@@ -27,6 +28,20 @@ class DomainAdaptNeuralNetClassifier(NeuralNetClassifier):
             )),
             ('print_log', TrainLog()),
         ]
+
+    @property
+    def classes_(self):
+        if hasattr(self, "classes_inferred_"):
+            return self.classes_inferred_
+        if hasattr(self, "classes") and self.classes is not None:
+            return np.asarray(self.classes)
+        if hasattr(self, "module_"):
+            nclasses = getattr(self.module_, "nclasses_", None)
+            if nclasses is None:
+                nclasses = getattr(self.module_, "nclasses", None)
+            if nclasses is not None:
+                return np.arange(int(nclasses))
+        raise AttributeError("classes_ is unavailable")
 
     def get_loss(self, mdl_pred, y_true, X=None, **kwargs):
         if isinstance(self.module_, BaseModel):
