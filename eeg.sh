@@ -348,7 +348,19 @@ if [[ "${TIMED_OUT}" -eq 1 ]]; then
     if [[ ! -f "${RESUBMIT_SCRIPT}" ]]; then
       RESUBMIT_SCRIPT="${FOUND_PROJECT}/eeg.sh"
     fi
-    sbatch "${RESUBMIT_SCRIPT}" "${ORIGINAL_ARGS[@]}"
+    RESUBMIT_RAW="$(sbatch --parsable "${RESUBMIT_SCRIPT}" "${ORIGINAL_ARGS[@]}")"
+    RESUBMIT_JOB_ID="${RESUBMIT_RAW%%;*}"
+    echo "[AUTO-RESUBMIT] previous_job_id=${SLURM_JOB_ID:-local} new_job_id=${RESUBMIT_JOB_ID} script=${RESUBMIT_SCRIPT}"
+    {
+      echo "===== $(date '+%F %T') ====="
+      echo "event=auto_resubmit"
+      echo "previous_job_id=${SLURM_JOB_ID:-local}"
+      echo "new_job_id=${RESUBMIT_JOB_ID}"
+      echo "resubmit_raw=${RESUBMIT_RAW}"
+      echo "script=${RESUBMIT_SCRIPT}"
+      echo "args=${ORIGINAL_ARGS[*]}"
+      echo
+    } >> "${ACC_FILE}"
     exit 0
   fi
   exit 0
