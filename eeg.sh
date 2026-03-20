@@ -33,6 +33,7 @@ MAX_RUNTIME_HOURS=23
 AUTO_RESUBMIT=1
 RESUME=1
 FORCE_SPDSW=0
+OUTER_PARALLEL=1
 
 OPENNEURO_DS004745_DIR=/leonardo_scratch/fast/EUHPC_D33_186/openneuro/ds004745
 OPENNEURO_DS004306_DIR=/leonardo_scratch/fast/EUHPC_D33_186/openneuro/ds004306
@@ -70,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     --lr) LR="$2"; shift 2 ;;
     --loss-lr) LOSS_LR="$2"; shift 2 ;;
     --max-runtime-hours) MAX_RUNTIME_HOURS="$2"; shift 2 ;;
+    --outer-parallel) OUTER_PARALLEL="$2"; shift 2 ;;
     --auto-resubmit) AUTO_RESUBMIT=1; shift ;;
     --no-auto-resubmit) AUTO_RESUBMIT=0; shift ;;
     --resume) RESUME=1; shift ;;
@@ -153,6 +155,10 @@ if ! [[ "${MAX_RUNTIME_HOURS}" =~ ^[0-9]+$ ]] || [[ "${MAX_RUNTIME_HOURS}" -le 0
   echo "[FATAL] --max-runtime-hours must be a positive integer, got '${MAX_RUNTIME_HOURS}'" >&2
   exit 5
 fi
+if ! [[ "${OUTER_PARALLEL}" =~ ^[0-9]+$ ]] || [[ "${OUTER_PARALLEL}" -le 0 ]]; then
+  echo "[FATAL] --outer-parallel must be a positive integer, got '${OUTER_PARALLEL}'" >&2
+  exit 7
+fi
 if [[ "${FRAMEWORK}" != "tsmnet" && "${FRAMEWORK}" != "spdnet" ]]; then
   echo "[FATAL] --framework must be tsmnet|spdnet, got '${FRAMEWORK}'" >&2
   exit 6
@@ -223,6 +229,160 @@ append_report() {
 
 IFS=',' read -r -a METRIC_LIST <<< "$METRICS"
 IFS=',' read -r -a SEED_ARRAY <<< "$SEED_LIST"
+ACTIVE_PIDS=()
+ACTIVE_STATUS_FILES=()
+STOP_LAUNCH=0
+FAILED_EXIT_CODE=0
+
+run_single_task() {
+  local metric="$1"
+  local report_metric="$2"
+  local seed="$3"
+  local done_file="$4"
+  local status_file="$5"
+  local now_ts elapsed remaining run_log run_pid watchdog_pid run_exit_code
+  local result_lines result_paths run_status timed_out_flag
+  now_ts="$(date +%s)"
+  elapsed=$((now_ts - RUN_START_TS))
+  run_log="${RUN_BASE_DIR}/run_${SLURM_JOB_ID:-local}_$(date +%Y%m%d_%H%M%S)_${metric}_seed${seed}.log"
+  if [[ "${elapsed}" -ge "${TIMEOUT_SECONDS}" ]]; then
+    run_status="timeout"
+    run_exit_code=0
+    timed_out_flag=1
+    result_lines="NO_FINAL_RESULTS_FOUND"
+    result_paths="NO_RESULT_PATH_FOUND"
+    append_report "${report_metric}" "${metric}" "${seed}" "${run_log}" "${result_lines}" "${result_paths}" "${run_status}"
+    {
+      echo "RUN_STATUS=${run_status}"
+      echo "RUN_EXIT_CODE=${run_exit_code}"
+      echo "TIMED_OUT_FLAG=${timed_out_flag}"
+    } > "${status_file}"
+    return 0
+  fi
+  remaining=$((TIMEOUT_SECONDS - elapsed))
+  if [[ "${remaining}" -le 0 ]]; then
+    run_status="timeout"
+    run_exit_code=0
+    timed_out_flag=1
+    result_lines="NO_FINAL_RESULTS_FOUND"
+    result_paths="NO_RESULT_PATH_FOUND"
+    append_report "${report_metric}" "${metric}" "${seed}" "${run_log}" "${result_lines}" "${result_paths}" "${run_status}"
+    {
+      echo "RUN_STATUS=${run_status}"
+      echo "RUN_EXIT_CODE=${run_exit_code}"
+      echo "TIMED_OUT_FLAG=${timed_out_flag}"
+    } > "${status_file}"
+    return 0
+  fi
+  set +e
+  if [[ "${FRAMEWORK}" == "tsmnet" ]]; then
+    python TSMNet-MLR.py \
+      hydra/launcher=joblib \
+      hydra.launcher.n_jobs="${N_JOBS}" hydra.sweeper.max_batch_size="${MAX_BATCH_SIZE}" \
+      dataset="${DATASET_CFG}" evaluation="${EVALUATION_CFG}" fit.data_dir="${EEG_DATA_ROOT}" fit.seed="${seed}" fit.device=GPU \
+      nnet.model.swd_metric="${metric}" nnet.model.use_lp="${USE_LP}" nnet.model.use_logm="${USE_LOGM}" \
+      nnet.model.n_proj="${N_PROJ}" nnet.model.swd_power="${SWD_POWER}" \
+      nnet.model.loss_lambda1_init="${LAMBDA1}" nnet.model.loss_lambda2_init="${LAMBDA2}" \
+      nnet.optimizer.lr="${LR}" nnet.optimizer.loss_lr="${LOSS_LR}" saving_model.is_save=True 2>&1 | tee "${run_log}" &
+  else
+    local spdnet_classifier="SPDMLR"
+    local spdnet_metric="SPDLogEuclideanMetric"
+    local spdnet_split_mode="random"
+    if [[ "${EVALUATION_CFG}" == *"inter-session"* ]]; then
+      spdnet_split_mode="session"
+    elif [[ "${EVALUATION_CFG}" == *"inter-subject"* ]]; then
+      spdnet_split_mode="subject"
+    fi
+    if [[ "${metric}" == "lsm" || "${metric}" == "olm" || "${metric}" == "spdsw" ]]; then
+      spdnet_metric="SPDLogCholeskyMetric"
+    fi
+    if [[ "${metric}" == "logeig" || "${metric}" == "logeigmlr" ]]; then
+      spdnet_classifier="LogEigMLR"
+    fi
+    python SPDNet-MLR.py \
+      hydra/launcher=joblib \
+      hydra.launcher.n_jobs=1 \
+      dataset=RADAR dataset.name="${DATASET_CFG}" dataset.path="${EEG_DATA_ROOT}" fit.seed="${seed}" \
+      +dataset.split_mode="${spdnet_split_mode}" \
+      nnet.model.classifier="${spdnet_classifier}" nnet.model.metric="${spdnet_metric}" \
+      nnet.optimizer.lr="${LR}" fit.is_save=True 2>&1 | tee "${run_log}" &
+  fi
+  run_pid=$!
+  (
+    sleep "${remaining}"
+    if kill -0 "${run_pid}" 2>/dev/null; then
+      echo "__EEG_TIMEOUT__" >> "${run_log}"
+      kill -TERM "${run_pid}" 2>/dev/null || true
+      sleep 20
+      kill -KILL "${run_pid}" 2>/dev/null || true
+    fi
+  ) &
+  watchdog_pid=$!
+  wait "${run_pid}"
+  run_exit_code=$?
+  kill "${watchdog_pid}" 2>/dev/null || true
+  wait "${watchdog_pid}" 2>/dev/null || true
+  set -e
+  result_lines="$(grep -Ei 'final results:' "${run_log}" || true)"
+  result_paths="$(grep -Ei 'results file path:' "${run_log}" || true)"
+  if [[ -z "${result_lines}" ]]; then
+    result_lines="NO_FINAL_RESULTS_FOUND"
+  fi
+  if [[ -z "${result_paths}" ]]; then
+    result_paths="NO_RESULT_PATH_FOUND"
+  fi
+  run_status="ok"
+  timed_out_flag=0
+  if grep -q "__EEG_TIMEOUT__" "${run_log}"; then
+    run_status="timeout"
+    timed_out_flag=1
+  elif [[ "${run_exit_code}" -ne 0 ]]; then
+    run_status="failed_exit_${run_exit_code}"
+  fi
+  append_report "${report_metric}" "${metric}" "${seed}" "${run_log}" "${result_lines}" "${result_paths}" "${run_status}"
+  if [[ "${run_status}" == "ok" ]]; then
+    touch "${done_file}"
+  fi
+  {
+    echo "RUN_STATUS=${run_status}"
+    echo "RUN_EXIT_CODE=${run_exit_code}"
+    echo "TIMED_OUT_FLAG=${timed_out_flag}"
+  } > "${status_file}"
+}
+
+collect_finished_tasks() {
+  local next_pids=()
+  local next_status_files=()
+  local i pid status_file task_exit task_timeout
+  for i in "${!ACTIVE_PIDS[@]}"; do
+    pid="${ACTIVE_PIDS[$i]}"
+    status_file="${ACTIVE_STATUS_FILES[$i]}"
+    if kill -0 "${pid}" 2>/dev/null; then
+      next_pids+=("${pid}")
+      next_status_files+=("${status_file}")
+      continue
+    fi
+    wait "${pid}" || true
+    task_exit=1
+    task_timeout=0
+    if [[ -f "${status_file}" ]]; then
+      task_exit="$(grep -E '^RUN_EXIT_CODE=' "${status_file}" | head -n1 | cut -d= -f2-)"
+      task_timeout="$(grep -E '^TIMED_OUT_FLAG=' "${status_file}" | head -n1 | cut -d= -f2-)"
+      rm -f "${status_file}"
+    fi
+    if [[ "${task_timeout}" == "1" ]]; then
+      TIMED_OUT=1
+      STOP_LAUNCH=1
+    fi
+    if [[ "${task_exit}" -ne 0 ]]; then
+      FAILED_EXIT_CODE="${task_exit}"
+      STOP_LAUNCH=1
+    fi
+  done
+  ACTIVE_PIDS=("${next_pids[@]}")
+  ACTIVE_STATUS_FILES=("${next_status_files[@]}")
+}
+
 for metric in "${METRIC_LIST[@]}"; do
   metric="$(echo "$metric" | tr -d '[:space:]')"
   if [[ -z "$metric" ]]; then
@@ -237,110 +397,42 @@ for metric in "${METRIC_LIST[@]}"; do
     if [[ -z "$seed" ]]; then
       continue
     fi
-
     safe_dataset="$(normalize_for_path "${DATASET_CFG}")"
     safe_eval="$(normalize_for_path "${EVALUATION_CFG}")"
     safe_metric="$(normalize_for_path "${REPORT_METRIC}")"
     safe_framework="$(normalize_for_path "${FRAMEWORK}")"
-    DONE_FILE="${CHECKPOINT_DIR}/done__${safe_framework}__${safe_dataset}__${safe_eval}__${safe_metric}__seed${seed}.ok"
-
+    safe_lp="$(normalize_for_path "${USE_LP}")"
+    safe_logm="$(normalize_for_path "${USE_LOGM}")"
+    safe_swd_power="$(normalize_for_path "${SWD_POWER}")"
+    DONE_FILE="${CHECKPOINT_DIR}/done__${safe_framework}__${safe_dataset}__${safe_eval}__${safe_metric}__lp${safe_lp}__logm${safe_logm}__p${safe_swd_power}__seed${seed}.ok"
     if [[ "${RESUME}" -eq 1 && -f "${DONE_FILE}" ]]; then
       continue
     fi
-
-    now_ts="$(date +%s)"
-    elapsed=$((now_ts - RUN_START_TS))
-    if [[ "${elapsed}" -ge "${TIMEOUT_SECONDS}" ]]; then
-      TIMED_OUT=1
+    if [[ "${STOP_LAUNCH}" -eq 1 ]]; then
       break
     fi
-
-    RUN_LOG="${RUN_BASE_DIR}/run_${SLURM_JOB_ID:-local}_$(date +%Y%m%d_%H%M%S)_${metric}_seed${seed}.log"
-    remaining=$((TIMEOUT_SECONDS - elapsed))
-    if [[ "${remaining}" -le 0 ]]; then
-      TIMED_OUT=1
-      break
-    fi
-
-    set +e
-    if [[ "${FRAMEWORK}" == "tsmnet" ]]; then
-      python TSMNet-MLR.py \
-        hydra/launcher=joblib \
-        hydra.launcher.n_jobs="${N_JOBS}" hydra.sweeper.max_batch_size="${MAX_BATCH_SIZE}" \
-        dataset="${DATASET_CFG}" evaluation="${EVALUATION_CFG}" fit.data_dir="${EEG_DATA_ROOT}" fit.seed="${seed}" fit.device=GPU \
-        nnet.model.swd_metric="${metric}" nnet.model.use_lp="${USE_LP}" nnet.model.use_logm="${USE_LOGM}" \
-        nnet.model.n_proj="${N_PROJ}" nnet.model.swd_power="${SWD_POWER}" \
-        nnet.model.loss_lambda1_init="${LAMBDA1}" nnet.model.loss_lambda2_init="${LAMBDA2}" \
-        nnet.optimizer.lr="${LR}" nnet.optimizer.loss_lr="${LOSS_LR}" saving_model.is_save=True 2>&1 | tee "${RUN_LOG}" &
-    else
-      SPDNET_CLASSIFIER="SPDMLR"
-      SPDNET_METRIC="SPDLogEuclideanMetric"
-      SPDNET_SPLIT_MODE="random"
-      if [[ "${EVALUATION_CFG}" == *"inter-session"* ]]; then
-        SPDNET_SPLIT_MODE="session"
-      elif [[ "${EVALUATION_CFG}" == *"inter-subject"* ]]; then
-        SPDNET_SPLIT_MODE="subject"
-      fi
-      if [[ "${metric}" == "lsm" || "${metric}" == "olm" || "${metric}" == "spdsw" ]]; then
-        SPDNET_METRIC="SPDLogCholeskyMetric"
-      fi
-      if [[ "${metric}" == "logeig" || "${metric}" == "logeigmlr" ]]; then
-        SPDNET_CLASSIFIER="LogEigMLR"
-      fi
-      python SPDNet-MLR.py \
-        hydra/launcher=joblib \
-        hydra.launcher.n_jobs=1 \
-        dataset=RADAR dataset.name="${DATASET_CFG}" dataset.path="${EEG_DATA_ROOT}" fit.seed="${seed}" \
-        dataset.split_mode="${SPDNET_SPLIT_MODE}" \
-        nnet.model.classifier="${SPDNET_CLASSIFIER}" nnet.model.metric="${SPDNET_METRIC}" \
-        nnet.optimizer.lr="${LR}" fit.is_save=True 2>&1 | tee "${RUN_LOG}" &
-    fi
-    RUN_PID=$!
-    (
-      sleep "${remaining}"
-      if kill -0 "${RUN_PID}" 2>/dev/null; then
-        echo "__EEG_TIMEOUT__" >> "${RUN_LOG}"
-        kill -TERM "${RUN_PID}" 2>/dev/null || true
-        sleep 20
-        kill -KILL "${RUN_PID}" 2>/dev/null || true
-      fi
-    ) &
-    WATCHDOG_PID=$!
-    wait "${RUN_PID}"
-    RUN_EXIT_CODE=$?
-    kill "${WATCHDOG_PID}" 2>/dev/null || true
-    wait "${WATCHDOG_PID}" 2>/dev/null || true
-    set -e
-
-    RESULT_LINES="$(grep -Ei 'final results:' "${RUN_LOG}" || true)"
-    RESULT_PATHS="$(grep -Ei 'results file path:' "${RUN_LOG}" || true)"
-    if [[ -z "${RESULT_LINES}" ]]; then
-      RESULT_LINES="NO_FINAL_RESULTS_FOUND"
-    fi
-    if [[ -z "${RESULT_PATHS}" ]]; then
-      RESULT_PATHS="NO_RESULT_PATH_FOUND"
-    fi
-    RUN_STATUS="ok"
-    if grep -q "__EEG_TIMEOUT__" "${RUN_LOG}"; then
-      RUN_STATUS="timeout"
-    elif [[ "${RUN_EXIT_CODE}" -ne 0 ]]; then
-      RUN_STATUS="failed_exit_${RUN_EXIT_CODE}"
-    fi
-
-    append_report "${REPORT_METRIC}" "${metric}" "${seed}" "${RUN_LOG}" "${RESULT_LINES}" "${RESULT_PATHS}" "${RUN_STATUS}"
-    if [[ "${RUN_STATUS}" == "timeout" ]]; then
-      TIMED_OUT=1
-      break
-    fi
-    if [[ "${RUN_EXIT_CODE}" -ne 0 ]]; then
-      exit "${RUN_EXIT_CODE}"
-    fi
-    touch "${DONE_FILE}"
+    while [[ "${#ACTIVE_PIDS[@]}" -ge "${OUTER_PARALLEL}" ]]; do
+      collect_finished_tasks
+      sleep 2
+    done
+    STATUS_FILE="${RUN_BASE_DIR}/.eeg_task_status_${SLURM_JOB_ID:-local}_$(date +%s%N)_${metric}_seed${seed}.env"
+    run_single_task "${metric}" "${REPORT_METRIC}" "${seed}" "${DONE_FILE}" "${STATUS_FILE}" &
+    ACTIVE_PIDS+=("$!")
+    ACTIVE_STATUS_FILES+=("${STATUS_FILE}")
   done
-  if [[ "${TIMED_OUT}" -eq 1 ]]; then
+  if [[ "${STOP_LAUNCH}" -eq 1 ]]; then
     break
   fi
 done
+
+while [[ "${#ACTIVE_PIDS[@]}" -gt 0 ]]; do
+  collect_finished_tasks
+  sleep 2
+done
+
+if [[ "${FAILED_EXIT_CODE}" -ne 0 ]]; then
+  exit "${FAILED_EXIT_CODE}"
+fi
 
 if [[ "${TIMED_OUT}" -eq 1 ]]; then
   if [[ "${AUTO_RESUBMIT}" -eq 1 ]]; then
