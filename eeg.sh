@@ -176,6 +176,16 @@ if [[ ! -d "$EEG_DATA_ROOT" ]]; then
   echo "[FATAL] data root not found: ${EEG_DATA_ROOT}" >&2
   exit 4
 fi
+if [[ "${DATASET_CFG,,}" == "bnci2015_001" ]]; then
+  BNCI2015_SOURCE_DIR="${MOABB_BNCI2015_001_DIR}"
+  BNCI2015_EXPECTED_DIR="${EEG_DATA_ROOT}/MNE-bnci-data/~bci/database/001-2015"
+  if [[ -d "${BNCI2015_SOURCE_DIR}" ]]; then
+    mkdir -p "${BNCI2015_EXPECTED_DIR}"
+    while IFS= read -r -d '' src_file; do
+      ln -sfn "${src_file}" "${BNCI2015_EXPECTED_DIR}/$(basename "${src_file}")"
+    done < <(find "${BNCI2015_SOURCE_DIR}" -maxdepth 1 -type f -name '*.mat' -print0)
+  fi
+fi
 
 RUN_START_TS="$(date +%s)"
 TIMEOUT_SECONDS=$((MAX_RUNTIME_HOURS * 3600))
