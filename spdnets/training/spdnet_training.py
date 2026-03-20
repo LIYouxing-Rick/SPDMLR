@@ -27,9 +27,39 @@ def training(cfg,args):
     # set dataset, model and optimizer
     args.DataLoader = get_dataset_settings(args)
     model = Get_Model.get_model(args)
-    loss_fn = nn.CrossEntropyLoss()
-    args.loss_fn = loss_fn.cuda()
-    args.opti = optimzer(model.parameters(), lr=args.lr, mode=args.optimizer,weight_decay=args.weight_decay)
+    args.device = th.device("cuda" if th.cuda.is_available() else "cpu")
+    model = model.to(args.device)
+    args.use_swd_reg = bool(getattr(args, "use_lp", False) or getattr(args, "use_logm", False))
+    if args.use_swd_reg:
+        from loss_function.loss import SWDloss
+        d = int(args.architecture[-1]) if isinstance(args.architecture, (list, tuple)) and len(args.architecture) else None
+        loss_fn = SWDloss(
+            power=float(getattr(args, "swd_power", 1.0)),
+            d=d,
+            n_proj=int(getattr(args, "n_proj", 50)),
+            device=str(args.device),
+            dtype=th.double,
+            seed=int(getattr(args, "seed", 42)),
+            metric=str(getattr(args, "swd_metric", "lsm")).lower(),
+            loss_lambda1_init=float(getattr(args, "loss_lambda1_init", 1.0)),
+            loss_lambda2_init=float(getattr(args, "loss_lambda2_init", 1.0)),
+            use_lp=bool(getattr(args, "use_lp", True)),
+            use_logm=bool(getattr(args, "use_logm", True)),
+        )
+        args.loss_fn = loss_fn.to(args.device)
+        weight_params = list(args.loss_fn.get_weight_parameters())
+        if len(weight_params):
+            param_groups = [
+                {"params": model.parameters(), "lr": args.lr, "weight_decay": args.weight_decay},
+                {"params": weight_params, "lr": float(getattr(args, "loss_lr", args.lr)), "weight_decay": 0.0},
+            ]
+            args.opti = optimzer(param_groups, lr=args.lr, mode=args.optimizer, weight_decay=args.weight_decay)
+        else:
+            args.opti = optimzer(model.parameters(), lr=args.lr, mode=args.optimizer, weight_decay=args.weight_decay)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+        args.loss_fn = loss_fn.to(args.device)
+        args.opti = optimzer(model.parameters(), lr=args.lr, mode=args.optimizer, weight_decay=args.weight_decay)
     # begin training
     val_acc = training_loop(model,args)
 

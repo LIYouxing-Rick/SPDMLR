@@ -8,7 +8,15 @@ model:
     power: 1.
     alpha: 1.0
     beta: 0.0
+    swd_metric: lsm
+    use_lp: false
+    use_logm: false
+    n_proj: 150
+    swd_power: 1.0
+    loss_lambda1_init: 1.0
+    loss_lambda2_init: 1.0
 optimizer:
     mode: AMSGRAD #AMSGRAD,SGD,ADAM
     lr: 1e-2
+    loss_lr: 5e-4
     weight_decay: 0

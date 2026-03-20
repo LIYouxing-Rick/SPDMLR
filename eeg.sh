@@ -136,9 +136,17 @@ cd "$FOUND_PROJECT"
 
 export HYDRA_FULL_ERROR=1
 export MNE_DATA="$EEG_DATA_ROOT"
-export OMP_NUM_THREADS=8
-export MKL_NUM_THREADS=8
-export OPENBLAS_NUM_THREADS=8
+CPU_TOTAL="${SLURM_CPUS_PER_TASK:-8}"
+if ! [[ "${CPU_TOTAL}" =~ ^[0-9]+$ ]] || [[ "${CPU_TOTAL}" -le 0 ]]; then
+  CPU_TOTAL=8
+fi
+CPU_PER_PROC=$((CPU_TOTAL / OUTER_PARALLEL))
+if [[ "${CPU_PER_PROC}" -le 0 ]]; then
+  CPU_PER_PROC=1
+fi
+export OMP_NUM_THREADS="${CPU_PER_PROC}"
+export MKL_NUM_THREADS="${CPU_PER_PROC}"
+export OPENBLAS_NUM_THREADS="${CPU_PER_PROC}"
 
 RUN_BASE_DIR="${SLURM_SUBMIT_DIR:-${FOUND_PROJECT}}"
 if [[ ! -d "${RUN_BASE_DIR}" ]]; then
@@ -203,38 +211,18 @@ append_report() {
   local result_lines="$5"
   local result_paths="$6"
   local run_status="$7"
-  {
-    echo "===== $(date '+%F %T') ====="
-    echo "job_id=${SLURM_JOB_ID:-local}"
-    echo "dataset=${DATASET_CFG}"
-    echo "framework=${FRAMEWORK}"
-    echo "evaluation=${EVALUATION_CFG}"
-    echo "metric=${report_metric}"
-    echo "raw_metric=${raw_metric}"
-    echo "distance_input=${METRICS}"
-    echo "seed=${seed}"
-    echo "seed_list=${SEED_LIST}"
-    echo "n_jobs=${N_JOBS}"
-    echo "max_batch_size=${MAX_BATCH_SIZE}"
-    echo "use_lp=${USE_LP}"
-    echo "use_logm=${USE_LOGM}"
-    echo "n_proj=${N_PROJ}"
-    echo "swd_power=${SWD_POWER}"
-    echo "loss_lambda1_init=${LAMBDA1}"
-    echo "loss_lambda2_init=${LAMBDA2}"
-    echo "lr=${LR}"
-    echo "loss_lr=${LOSS_LR}"
-    echo "data_root=${EEG_DATA_ROOT}"
-    echo "run_log=${run_log}"
-    echo "run_status=${run_status}"
-    echo "result_paths<<EOF"
-    echo "${result_paths}"
-    echo "EOF"
-    echo "results<<EOF"
-    echo "${result_lines}"
-    echo "EOF"
-    echo
-  } >> "${ACC_FILE}"
+  local ts job_id results_one_line paths_one_line
+  ts="$(date '+%F %T')"
+  job_id="${SLURM_JOB_ID:-local}"
+  results_one_line="$(printf "%s" "${result_lines}" | tr '\n' ' ' | tr '\t' ' ' | sed -E 's/[[:space:]]+/ /g')"
+  paths_one_line="$(printf "%s" "${result_paths}" | tr '\n' ' ' | tr '\t' ' ' | sed -E 's/[[:space:]]+/ /g')"
+  if [[ ! -s "${ACC_FILE}" ]]; then
+    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+      "ts" "job_id" "dataset" "framework" "evaluation" "metric" "raw_metric" "distance_input" "seed" "use_lp" "use_logm" "swd_power" "lr" "loss_lr" "status" "result_path" "final_results" >> "${ACC_FILE}"
+  fi
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+    "${ts}" "${job_id}" "${DATASET_CFG}" "${FRAMEWORK}" "${EVALUATION_CFG}" "${report_metric}" "${raw_metric}" "${METRICS}" "${seed}" \
+    "${USE_LP}" "${USE_LOGM}" "${SWD_POWER}" "${LR}" "${LOSS_LR}" "${run_status}" "${paths_one_line}" "${results_one_line}" >> "${ACC_FILE}"
 }
 
 IFS=',' read -r -a METRIC_LIST <<< "$METRICS"
@@ -315,6 +303,10 @@ run_single_task() {
       dataset=RADAR dataset.name="${DATASET_CFG}" dataset.path="${EEG_DATA_ROOT}" fit.seed="${seed}" \
       +dataset.split_mode="${spdnet_split_mode}" \
       nnet.model.classifier="${spdnet_classifier}" nnet.model.metric="${spdnet_metric}" \
+      +nnet.model.swd_metric="${metric}" +nnet.model.use_lp="${USE_LP}" +nnet.model.use_logm="${USE_LOGM}" \
+      +nnet.model.n_proj="${N_PROJ}" +nnet.model.swd_power="${SWD_POWER}" \
+      +nnet.model.loss_lambda1_init="${LAMBDA1}" +nnet.model.loss_lambda2_init="${LAMBDA2}" \
+      +nnet.optimizer.loss_lr="${LOSS_LR}" \
       nnet.optimizer.lr="${LR}" fit.is_save=True 2>&1 | tee "${run_log}" &
   fi
   run_pid=$!
@@ -453,16 +445,13 @@ if [[ "${TIMED_OUT}" -eq 1 ]]; then
     RESUBMIT_RAW="$(sbatch --parsable "${RESUBMIT_SCRIPT}" "${ORIGINAL_ARGS[@]}")"
     RESUBMIT_JOB_ID="${RESUBMIT_RAW%%;*}"
     echo "[AUTO-RESUBMIT] previous_job_id=${SLURM_JOB_ID:-local} new_job_id=${RESUBMIT_JOB_ID} script=${RESUBMIT_SCRIPT}"
-    {
-      echo "===== $(date '+%F %T') ====="
-      echo "event=auto_resubmit"
-      echo "previous_job_id=${SLURM_JOB_ID:-local}"
-      echo "new_job_id=${RESUBMIT_JOB_ID}"
-      echo "resubmit_raw=${RESUBMIT_RAW}"
-      echo "script=${RESUBMIT_SCRIPT}"
-      echo "args=${ORIGINAL_ARGS[*]}"
-      echo
-    } >> "${ACC_FILE}"
+    if [[ ! -s "${ACC_FILE}" ]]; then
+      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+        "ts" "job_id" "dataset" "framework" "evaluation" "metric" "raw_metric" "distance_input" "seed" "use_lp" "use_logm" "swd_power" "lr" "loss_lr" "status" "result_path" "final_results" >> "${ACC_FILE}"
+    fi
+    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+      "$(date '+%F %T')" "${SLURM_JOB_ID:-local}" "${DATASET_CFG}" "${FRAMEWORK}" "${EVALUATION_CFG}" "-" "-" "-" "-" \
+      "${USE_LP}" "${USE_LOGM}" "${SWD_POWER}" "${LR}" "${LOSS_LR}" "auto_resubmit:${RESUBMIT_JOB_ID}" "-" "-" >> "${ACC_FILE}"
     exit 0
   fi
   exit 0

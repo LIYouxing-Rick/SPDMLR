@@ -88,11 +88,19 @@ def parse_cfg(args,cfg):
     args.power = cfg.nnet.model.power
     args.alpha = cfg.nnet.model.alpha
     args.beta = eval(cfg.nnet.model.beta) if isinstance(cfg.nnet.model.beta, str) else cfg.nnet.model.beta
+    args.swd_metric = str(getattr(cfg.nnet.model, 'swd_metric', 'lsm')).lower()
+    args.use_lp = bool(getattr(cfg.nnet.model, 'use_lp', False))
+    args.use_logm = bool(getattr(cfg.nnet.model, 'use_logm', False))
+    args.n_proj = int(getattr(cfg.nnet.model, 'n_proj', 150))
+    args.swd_power = float(getattr(cfg.nnet.model, 'swd_power', 1.0))
+    args.loss_lambda1_init = float(getattr(cfg.nnet.model, 'loss_lambda1_init', 1.0))
+    args.loss_lambda2_init = float(getattr(cfg.nnet.model, 'loss_lambda2_init', 1.0))
 
     #optimizer
     args.optimizer = cfg.nnet.optimizer.mode
     args.lr = cfg.nnet.optimizer.lr
     args.weight_decay = cfg.nnet.optimizer.weight_decay
+    args.loss_lr = float(getattr(cfg.nnet.optimizer, 'loss_lr', args.lr))
 
     #dataset
     args.dataset = cfg.dataset.name
@@ -111,10 +119,19 @@ def train_per_epoch(model,args):
     epoch_loss, epoch_acc = [], []
     model.train()
     for local_batch, local_labels in args.DataLoader._train_generator:
+        if hasattr(args, "device"):
+            local_batch = local_batch.to(args.device)
+            local_labels = local_labels.to(args.device)
         local_batch = local_batch.to(th.double)
         args.opti.zero_grad()
-        out = model(local_batch)
-        l = args.loss_fn(out, local_labels)
+        if bool(getattr(args, "use_swd_reg", False)) and hasattr(model, "feature") and hasattr(model, "classifier"):
+            spd_features = model.feature(local_batch)
+            out = model.classifier(spd_features)
+            spd_features_in = spd_features.squeeze(1) if spd_features.ndim == 4 and spd_features.shape[1] == 1 else spd_features
+            l = args.loss_fn(out, local_labels, spd_features=spd_features_in)
+        else:
+            out = model(local_batch)
+            l = args.loss_fn(out, local_labels)
         acc, loss = (out.argmax(1) == local_labels).cpu().numpy().sum() / out.shape[0], l.cpu().data.numpy()
         epoch_loss.append(loss)
         epoch_acc.append(acc)
@@ -130,9 +147,17 @@ def val_per_epoch(model,args):
     model.eval()
     with th.no_grad():
         for local_batch, local_labels in args.DataLoader._test_generator:
+            if hasattr(args, "device"):
+                local_batch = local_batch.to(args.device)
+                local_labels = local_labels.to(args.device)
             local_batch = local_batch.to(th.double)
-            out = model(local_batch)
-            l = args.loss_fn(out, local_labels)
+            if bool(getattr(args, "use_swd_reg", False)) and hasattr(model, "feature") and hasattr(model, "classifier"):
+                spd_features = model.feature(local_batch)
+                out = model.classifier(spd_features)
+                l = args.loss_fn(out, local_labels, spd_features=None)
+            else:
+                out = model(local_batch)
+                l = args.loss_fn(out, local_labels)
             predicted_labels = out.argmax(1)
             y_true.extend(list(local_labels.cpu().numpy()))
             y_pred.extend(list(predicted_labels.cpu().numpy()))
